@@ -163,11 +163,111 @@ class Hand:
         return toss_cards
 
 
-def play():
-    player = Player()
+deck = Deck()
+player = Player()
 
+dealer_hand = Hand()
+player_hand = Hand()
+
+
+def player_bet():
+    while True:
+        bet_input = input("Place your bet: ")
+
+        if bet_input == 'x':
+            return -1
+
+        if not bet_input.isdigit():
+            print(f'{bet_input} is not a valid entry')
+            continue
+
+        bet_amount = int(bet_input)
+        if bet_amount < 1:
+            print('Bets must be greater than 0')
+            continue
+
+        try:
+            bet = player.bet(bet_amount)
+        except ValueError:
+            print(f'You do not have enough to bet that high')
+            continue
+
+        return bet
+
+
+def display_hands():
+    print(f'Dealer: {dealer_hand} | Player: {player_hand}')
+
+
+def player_turn():
+    while 1:
+        action = input('(H)it or (S)tay? ').lower()
+
+        if action == 'h':
+            player_hand.add(deck.draw())
+            display_hands()
+            if player_hand.value() > 21:
+                break
+
+        if action == 's':
+            break
+
+
+def dealer_turn():
+    while dealer_hand.value() < 17:
+        dealer_hand.add(deck.draw())
+
+
+def play():
     print('Welcome to Blackjack!')
-    print(f'Player Bank: {player.bank}')
+
+    deck.shuffle()
+
+    while True:
+        if deck.remain() < 12:
+            print('Shuffling...')
+            deck.shuffle()
+
+        print(f'Player Bank: {player.bank}')
+        bet = player_bet()
+        if bet < 1:
+            print('Thank you for playing!')
+            break
+
+        player_hand.add(deck.draw())
+        dealer_hand.add(deck.draw())
+        player_hand.add(deck.draw())
+        dealer_hand.add(deck.draw())
+        display_hands()
+
+        player_turn()
+        if player_hand.value() > 21:
+            print('You busted... Dealer wins!')
+            deck.discard(player_hand.toss())
+            deck.discard(dealer_hand.toss())
+            continue
+
+        dealer_turn()
+        display_hands()
+
+        if dealer_hand.value() > 21:
+            print('Dealer busts... You Win!')
+            player.win(bet * 2)
+            deck.discard(player_hand.toss())
+            deck.discard(dealer_hand.toss())
+            continue
+
+        if dealer_hand.value() == player_hand.value():
+            print('The hand is a push')
+            player.win(bet)
+        elif dealer_hand.value() > player_hand.value():
+            print('Dealer wins!')
+        else:
+            print('Player wins!')
+            player.win(bet * 2)
+
+        deck.discard(player_hand.toss())
+        deck.discard(dealer_hand.toss())
 
 
 if __name__ == '__main__':

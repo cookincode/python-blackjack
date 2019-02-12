@@ -132,6 +132,10 @@ class Player:
 
     def __init__(self, bank=100):
         self.bank = bank
+        self.hand = Hand()
+
+    def pay(self, amount):
+        self.bank += amount
 
     def bet(self, amount):
         if self.bank < amount:
@@ -139,8 +143,16 @@ class Player:
         self.bank -= amount
         return amount
 
-    def win(self, amount):
-        self.bank += amount
+    def check(self):
+        if len(self.hand.cards) == 2 and self.hand.value() == 21:
+            return 'blackjack'
+        if self.hand.value() > 21:
+            return 'busted'
+
+        return 'ok'
+
+    def add_card(self, card):
+        self.hand.add(card)
 
 
 class Hand:
@@ -177,9 +189,7 @@ class Hand:
 
 deck = Deck()
 player = Player()
-
-dealer_hand = Hand()
-player_hand = Hand()
+dealer = Player()
 
 
 def player_bet():
@@ -208,7 +218,7 @@ def player_bet():
 
 
 def display_hands():
-    print(f'Dealer: {dealer_hand} | Player: {player_hand}')
+    print(f'Dealer: {dealer.hand} | Player: {player.hand}')
 
 
 def player_turn():
@@ -216,9 +226,9 @@ def player_turn():
         action = input('(H)it or (S)tay? ').lower()
 
         if action == 'h':
-            player_hand.add(deck.draw())
+            player.add_card(deck.draw())
             display_hands()
-            if player_hand.value() > 21:
+            if player.check() == 'busted':
                 break
 
         if action == 's':
@@ -226,8 +236,8 @@ def player_turn():
 
 
 def dealer_turn():
-    while dealer_hand.value() < 17:
-        dealer_hand.add(deck.draw())
+    while dealer.hand.value() < 17:
+        dealer.add_card(deck.draw())
 
 
 def play():
@@ -236,6 +246,10 @@ def play():
     deck.shuffle()
 
     while True:
+        if player.bank <= 0:
+            print('You are out of money. Thank you for playing.')
+            break
+
         if deck.remain() < 12:
             print('Shuffling...')
             deck.shuffle()
@@ -246,40 +260,67 @@ def play():
             print('Thank you for playing!')
             break
 
-        player_hand.add(deck.draw(face_down=False))
-        dealer_hand.add(deck.draw(face_down=True))
-        player_hand.add(deck.draw(face_down=False))
-        dealer_hand.add(deck.draw(face_down=False))
-        display_hands()
+        player.add_card(deck.draw(face_down=False))
+        dealer.add_card(deck.draw(face_down=True))
+        player.add_card(deck.draw(face_down=False))
+        dealer.add_card(deck.draw(face_down=False))
 
-        player_turn()
-        if player_hand.value() > 21:
-            print('You busted... Dealer wins!')
-            deck.discard(player_hand.toss())
-            deck.discard(dealer_hand.toss())
+        if player.check() == 'blackjack' and dealer.check() == 'blackjack':
+            print('Both dealer and player got blackjack. Game is a push.')
+            dealer.hand.cards[0].turn()
+            display_hands()
+            player.pay(bet)
+            deck.discard(player.hand.toss())
+            deck.discard(dealer.hand.toss())
+            continue
+        if player.check() == 'blackjack':
+            print('Player got blackjack!')
+            dealer.hand.cards[0].turn()
+            display_hands()
+            player.pay(bet * 3)
+            deck.discard(player.hand.toss())
+            deck.discard(dealer.hand.toss())
+            continue
+        if dealer.check() == 'blackjack':
+            print('Dealer got blackjack!')
+            dealer.hand.cards[0].turn()
+            display_hands()
+            deck.discard(player.hand.toss())
+            deck.discard(dealer.hand.toss())
             continue
 
+        display_hands()
+        player_turn()
+        if player.check() == 'busted':
+            print('You busted... Dealer wins!')
+            dealer.hand.cards[0].turn()
+            display_hands()
+            deck.discard(player.hand.toss())
+            deck.discard(dealer.hand.toss())
+            continue
+
+        dealer.hand.cards[0].turn()
         dealer_turn()
         display_hands()
 
-        if dealer_hand.value() > 21:
+        if dealer.check() == 'busted':
             print('Dealer busts... You Win!')
-            player.win(bet * 2)
-            deck.discard(player_hand.toss())
-            deck.discard(dealer_hand.toss())
+            player.pay(bet * 2)
+            deck.discard(player.hand.toss())
+            deck.discard(dealer.hand.toss())
             continue
 
-        if dealer_hand.value() == player_hand.value():
+        if dealer.hand.value() == player.hand.value():
             print('The hand is a push')
-            player.win(bet)
-        elif dealer_hand.value() > player_hand.value():
+            player.pay(bet)
+        elif dealer.hand.value() > player.hand.value():
             print('Dealer wins!')
         else:
             print('Player wins!')
-            player.win(bet * 2)
+            player.pay(bet * 2)
 
-        deck.discard(player_hand.toss())
-        deck.discard(dealer_hand.toss())
+        deck.discard(player.hand.toss())
+        deck.discard(dealer.hand.toss())
 
 
 if __name__ == '__main__':

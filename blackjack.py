@@ -9,7 +9,7 @@ class Card:
     valid_suits = ['spade', 'heart', 'diamond', 'club']
     valid_ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 
-    def __init__(self, suit, rank):
+    def __init__(self, suit, rank, face_down=False):
         if suit not in self.valid_suits:
             raise ValueError(f'{suit} is not a valid suit type')
         if rank not in self.valid_ranks:
@@ -17,9 +17,21 @@ class Card:
 
         self.suit = suit
         self.rank = rank
+        self.face_down = face_down
 
     def __str__(self):
+        if self.face_down:
+            return '##'
+
         return f'{self.rank}{self.suit[0].upper()}'
+
+    def turn(self, face_down=None):
+        if face_down is None:
+            self.face_down = not self.face_down
+        else:
+            self.face_down = face_down
+
+        return self
 
 
 class Deck:
@@ -96,11 +108,11 @@ class Deck:
         else:
             random.shuffle(self.cards)
 
-    def draw(self):
+    def draw(self, face_down=False):
         if len(self.cards) == 0:
             return None
 
-        return self.cards.pop(0)
+        return self.cards.pop(0).turn(face_down=face_down)
 
     def discard(self, cards):
         if type(cards) == Card:
@@ -234,10 +246,10 @@ def play():
             print('Thank you for playing!')
             break
 
-        player_hand.add(deck.draw())
-        dealer_hand.add(deck.draw())
-        player_hand.add(deck.draw())
-        dealer_hand.add(deck.draw())
+        player_hand.add(deck.draw(face_down=False))
+        dealer_hand.add(deck.draw(face_down=True))
+        player_hand.add(deck.draw(face_down=False))
+        dealer_hand.add(deck.draw(face_down=False))
         display_hands()
 
         player_turn()

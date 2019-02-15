@@ -221,6 +221,13 @@ def display_hands():
     print(f'Dealer: {dealer.hand} | Player: {player.hand}')
 
 
+def deal():
+    player.add_card(deck.draw(face_down=False))
+    dealer.add_card(deck.draw(face_down=True))
+    player.add_card(deck.draw(face_down=False))
+    dealer.add_card(deck.draw(face_down=False))
+
+
 def player_turn():
     while 1:
         action = input('(H)it or (S)tay? ').lower()
@@ -240,12 +247,25 @@ def dealer_turn():
         dealer.add_card(deck.draw())
 
 
+def settle_hand(winner, bet, multiplier=2):
+    dealer.hand.cards[0].turn(face_down=False)
+    display_hands()
+    if winner == 'push':
+        player.pay(bet)
+    if winner == 'player':
+        player.pay(bet * multiplier)
+    deck.discard(player.hand.toss())
+    deck.discard(dealer.hand.toss())
+
+
 def play():
     print('Welcome to Blackjack!')
 
     deck.shuffle()
 
     while True:
+
+        # Get Bet
         if player.bank <= 0:
             print('You are out of money. Thank you for playing.')
             break
@@ -260,67 +280,49 @@ def play():
             print('Thank you for playing!')
             break
 
-        player.add_card(deck.draw(face_down=False))
-        dealer.add_card(deck.draw(face_down=True))
-        player.add_card(deck.draw(face_down=False))
-        dealer.add_card(deck.draw(face_down=False))
-
+        # Deal Check
+        deal()
         if player.check() == 'blackjack' and dealer.check() == 'blackjack':
             print('Both dealer and player got blackjack. Game is a push.')
-            dealer.hand.cards[0].turn()
-            display_hands()
-            player.pay(bet)
-            deck.discard(player.hand.toss())
-            deck.discard(dealer.hand.toss())
+            settle_hand('push', bet)
             continue
         if player.check() == 'blackjack':
             print('Player got blackjack!')
-            dealer.hand.cards[0].turn()
-            display_hands()
-            player.pay(bet * 3)
-            deck.discard(player.hand.toss())
-            deck.discard(dealer.hand.toss())
+            settle_hand('player', bet, multiplier=3)
             continue
         if dealer.check() == 'blackjack':
             print('Dealer got blackjack!')
-            dealer.hand.cards[0].turn()
-            display_hands()
-            deck.discard(player.hand.toss())
-            deck.discard(dealer.hand.toss())
+            settle_hand('dealer', bet)
             continue
 
+        # Player Turn
         display_hands()
         player_turn()
         if player.check() == 'busted':
             print('You busted... Dealer wins!')
-            dealer.hand.cards[0].turn()
-            display_hands()
-            deck.discard(player.hand.toss())
-            deck.discard(dealer.hand.toss())
+            settle_hand('dealer', bet)
             continue
 
+        # Dealer Turn
         dealer.hand.cards[0].turn()
         dealer_turn()
         display_hands()
 
         if dealer.check() == 'busted':
             print('Dealer busts... You Win!')
-            player.pay(bet * 2)
-            deck.discard(player.hand.toss())
-            deck.discard(dealer.hand.toss())
+            settle_hand('player', bet)
             continue
 
+        # Winner Check
         if dealer.hand.value() == player.hand.value():
             print('The hand is a push')
-            player.pay(bet)
+            settle_hand('push', bet)
         elif dealer.hand.value() > player.hand.value():
             print('Dealer wins!')
+            settle_hand('dealer', bet)
         else:
             print('Player wins!')
-            player.pay(bet * 2)
-
-        deck.discard(player.hand.toss())
-        deck.discard(dealer.hand.toss())
+            settle_hand('player', bet)
 
 
 if __name__ == '__main__':

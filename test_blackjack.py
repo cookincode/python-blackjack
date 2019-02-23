@@ -2,6 +2,7 @@ import io
 from unittest import TestCase, mock
 
 import blackjack
+from deck.deck import Deck
 
 
 class TestBlackjack(TestCase):
@@ -39,3 +40,19 @@ class TestBlackjack(TestCase):
         actual = blackjack.player_bet()
         self.assertEqual('You do not have enough to bet that high\n', mock_stdout.getvalue())
         self.assertEqual(-1, actual)
+
+    def test_shuffle(self):
+        discard = []
+        deck = Deck()
+
+        blackjack.shuffle(deck, discard)
+        discard.append(next(deck).up())
+        self.assertEqual(1, len(discard))
+        self.assertEqual(51, len(deck))
+
+        blackjack.shuffle(deck, discard)
+        self.assertEqual(0, len(discard))
+        self.assertEqual(52, len(deck))
+        discard.append(next(deck).up())
+        self.assertEqual(1, len(discard))
+        self.assertEqual(51, len(deck))

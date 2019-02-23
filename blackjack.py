@@ -3,76 +3,7 @@
 """Blackjack Game"""
 import random
 
-
-class Card:
-
-    valid_suits = ['spade', 'heart', 'diamond', 'club']
-    valid_ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-
-    def __init__(self, suit, rank, face_down=False):
-        if suit not in self.valid_suits:
-            raise ValueError(f'{suit} is not a valid suit type')
-        if rank not in self.valid_ranks:
-            raise ValueError(f'{rank} is not a valid rank')
-
-        self.suit = suit
-        self.rank = rank
-        self.face_down = face_down
-
-    def __str__(self):
-        if self.face_down:
-            return '##'
-
-        return f'{self.rank}{self.suit[0].upper()}'
-
-    def turn(self, face_down=None):
-        if face_down is None:
-            self.face_down = not self.face_down
-        else:
-            self.face_down = face_down
-
-        return self
-
-
-class Deck:
-
-    def __init__(self):
-        self.cards = [Card(suit, rank) for suit in Card.valid_suits for rank in Card.valid_ranks]
-        self.discard_cards = []
-
-    def __str__(self):
-        return ','.join([str(card) for card in self.cards])
-
-    def shuffle(self, include_discard=True, seed=None):
-        if include_discard:
-            # Move discarded cards back to deck
-            self.cards.extend(self.discard_cards)
-            self.discard_cards.clear()
-
-        if seed:
-            rnd = random.Random(seed)
-            rnd.shuffle(self.cards)
-        else:
-            random.shuffle(self.cards)
-
-    def draw(self, face_down=False):
-        if len(self.cards) == 0:
-            return None
-
-        return self.cards.pop(0).turn(face_down=face_down)
-
-    def discard(self, cards):
-        if type(cards) == Card:
-            self.discard_cards.append(cards)
-
-        elif type(cards) == list:
-            self.discard_cards.extend(cards)
-
-        else:
-            print(f'Error discarding card: {type(cards)}')
-
-    def remain(self):
-        return len(self.cards)
+from deck.deck import Deck
 
 
 class Player:
@@ -134,7 +65,8 @@ class Hand:
         return toss_cards
 
 
-deck = Deck()
+discard = []
+
 player = Player()
 dealer = Player()
 
@@ -168,47 +100,29 @@ def display_hands():
     print(f'Dealer: {dealer.hand} | Player: {player.hand}')
 
 
-def deal():
-    player.add_card(deck.draw(face_down=False))
-    dealer.add_card(deck.draw(face_down=True))
-    player.add_card(deck.draw(face_down=False))
-    dealer.add_card(deck.draw(face_down=False))
-
-
-def player_turn():
-    while 1:
-        action = input('(H)it or (S)tay? ').lower()
-
-        if action == 'h':
-            player.add_card(deck.draw())
-            display_hands()
-            if player.check() == 'busted':
-                break
-
-        if action == 's':
-            break
-
-
-def dealer_turn():
-    while dealer.hand.value() < 17:
-        dealer.add_card(deck.draw())
-
-
 def settle_hand(winner, bet, multiplier=2):
-    dealer.hand.cards[0].turn(face_down=False)
+    dealer.hand.cards[0].up()
     display_hands()
     if winner == 'push':
         player.pay(bet)
     if winner == 'player':
         player.pay(bet * multiplier)
-    deck.discard(player.hand.toss())
-    deck.discard(dealer.hand.toss())
+    discard.extend(player.hand.toss())
+    discard.extend(dealer.hand.toss())
+
+
+def shuffle(deck, discards):
+    print('Shuffling...')
+    deck.add_cards(discards)
+    discards.clear()
+    random.shuffle(deck)
 
 
 def play():
     print('Welcome to Blackjack!')
 
-    deck.shuffle()
+    deck = Deck()
+    shuffle(deck, discard)
 
     while True:
 
@@ -217,9 +131,8 @@ def play():
             print('You are out of money. Thank you for playing.')
             break
 
-        if deck.remain() < 12:
-            print('Shuffling...')
-            deck.shuffle()
+        if len(deck) < 12:
+            shuffle(deck, discard)
 
         print(f'Player Bank: {player.bank}')
         bet = player_bet()
@@ -228,7 +141,11 @@ def play():
             break
 
         # Deal Check
-        deal()
+        player.add_card(next(deck).up())
+        dealer.add_card(next(deck))
+        player.add_card(next(deck).up())
+        dealer.add_card(next(deck).up())
+
         if player.check() == 'blackjack' and dealer.check() == 'blackjack':
             print('Both dealer and player got blackjack. Game is a push.')
             settle_hand('push', bet)
@@ -244,7 +161,18 @@ def play():
 
         # Player Turn
         display_hands()
-        player_turn()
+        while True:
+            action = input('(H)it or (S)tay? ').lower()
+
+            if action == 'h':
+                player.add_card(next(deck).up())
+                display_hands()
+                if player.check() == 'busted':
+                    break
+
+            if action == 's':
+                break
+
         if player.check() == 'busted':
             print('You busted... Dealer wins!')
             settle_hand('dealer', bet)
@@ -252,7 +180,10 @@ def play():
 
         # Dealer Turn
         dealer.hand.cards[0].turn()
-        dealer_turn()
+
+        while dealer.hand.value() < 17:
+            dealer.add_card(next(deck).up())
+
         display_hands()
 
         if dealer.check() == 'busted':

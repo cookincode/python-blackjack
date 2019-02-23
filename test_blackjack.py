@@ -2,7 +2,7 @@ import io
 from unittest import TestCase, mock
 
 import blackjack
-from deck.deck import Deck
+from deck.deck import Deck, Card
 
 
 class TestBlackjack(TestCase):
@@ -56,3 +56,17 @@ class TestBlackjack(TestCase):
         discard.append(next(deck).up())
         self.assertEqual(1, len(discard))
         self.assertEqual(51, len(deck))
+
+    def test_calculate_cards(self):
+        cards = [Card('A', 'spade'), Card('A', 'heart')]
+        self.assertEqual(12, blackjack.calculate_cards(cards))
+        cards.append(Card('2', 'club'))
+        self.assertEqual(14, blackjack.calculate_cards(cards))
+        cards.append(Card('K', 'diamond'))
+        self.assertEqual(14, blackjack.calculate_cards(cards))
+        cards.append(Card('Q', 'heart'))
+        self.assertEqual(24, blackjack.calculate_cards(cards))
+
+    def test_calculate_cards_blackjack(self):
+        cards = [Card('A', 'spade'), Card('J', 'spade')]
+        self.assertEqual(21, blackjack.calculate_cards(cards))

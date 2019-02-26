@@ -7,38 +7,41 @@ class TestHand(TestCase):
     def setUp(self):
         self.hand = Hand()
 
-    def test_value_blackjack(self):
-        self.hand.add(Card('spade', 'A'))
-        self.hand.add(Card('spade', 'J'))
-        self.assertEqual(21, self.hand.value())
+    def tearDown(self):
+        print(f'tearDown: {id(self.hand.cards)}')
+        self.hand.cards.clear()
 
-    def test_value_a_1_or_11(self):
-        self.hand.add(Card('spade', 'A'))
-        self.hand.add(Card('spade', '9'))
-        self.assertEqual(20, self.hand.value())
-        self.hand.add(Card('spade', '2'))
-        self.assertEqual(12, self.hand.value())
-        self.hand.add(Card('diamond', 'A'))
-        self.assertEqual(13, self.hand.value())
-
-    def test_value_blackjack_bust(self):
-        self.hand.add(Card('spade', 'K'))
-        self.hand.add(Card('spade', '6'))
-        self.hand.add(Card('spade', 'Q'))
-        self.assertEqual(26, self.hand.value())
-
-    def test_add(self):
-        self.hand.add(Card('spade', 'A'))
-        self.assertEqual(1, len(self.hand.cards))
-        self.assertEqual('AS', str(self.hand.cards[0]))
-
-    def test_toss(self):
-        self.hand.add(Card('spade', 'A'))
-        self.hand.add(Card('spade', '2'))
-        self.assertEqual(2, len(self.hand.cards))
-
-        cards = self.hand.toss()
+    def test_hit(self):
+        print(f'hit: {id(self.hand.cards)}')
+        card = Card('2', 'clubs')
         self.assertEqual(0, len(self.hand.cards))
-        self.assertEqual(2, len(cards))
-        self.assertEqual('AS', str(cards[0]))
-        self.assertEqual('2S', str(cards[1]))
+        self.hand.hit(card)
+        self.assertEqual(1, len(self.hand.cards))
+        self.assertTrue(card in self.hand.cards)
+
+    def test_discard(self):
+        print(f'discard-1: {id(self.hand.cards)}')
+        card1 = Card('A', 'spades')
+        card2 = Card('K', 'diamonds')
+        self.hand.cards.extend([card1, card2])
+        self.assertEqual(2, len(self.hand.cards))
+        discard = self.hand.discard()
+        self.assertEqual(2, len(discard))
+        self.assertTrue(card1 in discard)
+        self.assertTrue(card2 in discard)
+        print(f'discard-2: {id(self.hand.cards)}')
+        self.assertEqual(0, len(self.hand.cards))
+
+    def test_calculate_cards(self):
+        self.hand.cards.extend([Card('A', 'spade'), Card('A', 'heart')])
+        self.assertEqual(12, self.hand.value())
+        self.hand.cards.append(Card('2', 'club'))
+        self.assertEqual(14, self.hand.value())
+        self.hand.cards.append(Card('K', 'diamond'))
+        self.assertEqual(14, self.hand.value())
+        self.hand.cards.append(Card('Q', 'heart'))
+        self.assertEqual(24, self.hand.value())
+
+    def test_calculate_cards_blackjack(self):
+        self.hand.cards.extend([Card('A', 'spade'), Card('J', 'spade')])
+        self.assertEqual(21, self.hand.value())

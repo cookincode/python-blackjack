@@ -6,32 +6,14 @@ import random
 from deck.deck import Deck, Card
 
 
-class Player:
-
-    def __init__(self, bank=100):
-        self.bank = bank
-        self.hand = Hand()
-
-    def pay(self, amount):
-        self.bank += amount
-
-    def bet(self, amount):
-        if self.bank < amount:
-            raise ValueError("insufficient bank funds")
-        self.bank -= amount
-        return amount
-
-    def add_card(self, card):
-        self.hand.hit(card)
-
-
 class Hand:
-
     card_values = {'A': 11, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
                    '8': 8, '9': 9, '10': 10, 'J': 10, 'Q': 10, 'K': 10}
 
-    def __init__(self):
-        self.cards = []
+    def __init__(self, bet=0):
+        self.cards: [Card] = []
+        self.bet = bet
+        self.state = 'play'
 
     def __str__(self):
         return ','.join([str(card) for card in self.cards])
@@ -39,9 +21,30 @@ class Hand:
     def hit(self, card: Card):
         self.cards.append(card)
 
-    def discard(self) -> [Card]:
-        dis, self.cards = self.cards[:], []
-        return dis
+    def settle(self, hand: "Hand", multiplier=2) -> int:
+        this_value = self.value()
+        other_value = hand.value()
+        this_bet = self.bet
+
+        if this_value > 21:
+            self.state = 'bust'
+            self.bet = 0
+            return this_bet
+        if other_value > 21:
+            self.state = 'win'
+            self.bet = this_bet * multiplier
+            return this_bet - self.bet
+        if this_value == other_value:
+            self.state = 'push'
+            return 0
+        if this_value < other_value:
+            self.state = 'lose'
+            self.bet = 0
+            return this_bet
+        if this_value > other_value:
+            self.state = 'win'
+            self.bet = this_bet * multiplier
+            return this_bet - self.bet
 
     def value(self) -> int:
         values = [self.card_values[card.rank] for card in self.cards]
@@ -56,13 +59,64 @@ class Hand:
         return total_score
 
 
-discard = []
+class Dealer:
 
-player = Player()
-dealer = Player()
+    def __init__(self, deck: Deck, shuffle=True):
+        self.deck = deck
+        self.hand = None
+        self.discard_cards: [Card] = []
+        if shuffle:
+            self.shuffle()  # Shuffle a fresh deck
+
+    def shuffle(self):
+        print('Shuffling...')
+        self.deck.add_cards(self.discard_cards)
+        self.discard_cards.clear()
+        random.shuffle(self.deck)
+
+    def deal(self, hands: [Hand]):
+        self.hand = Hand()
+
+        for r in range(0, 2):
+            for hand in hands:
+                hand.cards.append(next(self.deck).up())
+
+            card = next(self.deck).down()
+            if r % 2:
+                card.up()
+            self.hand.cards.append(card)
+
+    def turn(self):
+        self.hand.cards[0].up()
+
+    def hit(self, hand: Hand):
+        hand.cards.append(next(self.deck).up())
+
+    def settle(self, hand: Hand, multiplier=2):
+        hand.settle(self.hand, multiplier)
+        self.discard_cards.extend(hand.cards)
+        hand.cards.clear()
+
+    def cleanup(self):
+        self.discard_cards.extend(self.hand.cards)
+        self.hand.cards.clear()
+
+        if len(self.deck) < 17:
+            self.shuffle()
 
 
-def player_bet():
+class Player:
+
+    def __init__(self, bank=100):
+        self.bank = bank
+        self.hand = None
+
+    def settle(self):
+        self.bank = self.bank + self.hand.bet
+        self.hand = None
+
+
+def player_bet(player: Player) -> int:
     while True:
         bet_input = input("Place your bet: ")
 
@@ -78,87 +132,69 @@ def player_bet():
             print('Bets must be greater than 0')
             continue
 
-        try:
-            bet = player.bet(bet_amount)
-        except ValueError:
-            print(f'You do not have enough to bet that high')
+        if bet_amount > player.bank:
+            print('You do not have enough to cover that bet')
             continue
 
-        return bet
+        player.bank = player.bank - bet_amount
+        return bet_amount
 
 
-def display_hands():
+def display_hands(dealer, player):
     print(f'Dealer: {dealer.hand} | Player: {player.hand}')
 
 
-def settle_hand(winner, bet, multiplier=2):
-    dealer.hand.cards[0].up()
-    display_hands()
-    if winner == 'push':
-        player.pay(bet)
-    if winner == 'player':
-        player.pay(bet * multiplier)
-    discard.extend(player.hand.discard())
-    discard.extend(dealer.hand.discard())
-
-
-def shuffle(deck, discards):
-    print('Shuffling...')
-    deck.add_cards(discards)
-    discards.clear()
-    random.shuffle(deck)
+def post_action(dealer: Dealer, player: Player, multiplier=2):
+    dealer.turn()
+    display_hands(dealer, player)
+    dealer.settle(player.hand, multiplier)
+    print(f'Hand is a {player.hand.state}')
+    player.settle()
+    dealer.cleanup()
 
 
 def play():
     print('Welcome to Blackjack!')
 
     deck = Deck()
-    shuffle(deck, discard)
+    dealer = Dealer(deck)
+    player = Player(100)
 
     while True:
 
-        # Get Bet
         if player.bank <= 0:
             print('You are out of money. Thank you for playing.')
             break
 
-        if len(deck) < 12:
-            shuffle(deck, discard)
-
+        # Get Bet
         print(f'Player Bank: {player.bank}')
-        bet = player_bet()
+        bet = player_bet(player)
         if bet < 1:
             print('Thank you for playing!')
             break
 
-        # Deal Check
-        player.add_card(next(deck).up())
-        dealer.add_card(next(deck))
-        player.add_card(next(deck).up())
-        dealer.add_card(next(deck).up())
+        player.hand = Hand(bet)
 
-        if player.hand.value() == 21 and dealer.hand.cards == 21:
-            print('Both dealer and player got blackjack. Game is a push.')
-            settle_hand('push', bet)
-            continue
-        if player.hand.value() == 21:
-            print('Player got blackjack!')
-            settle_hand('player', bet, multiplier=3)
-            continue
+        # Deal
+        dealer.deal([player.hand])
+
         if dealer.hand.value() == 21:
-            print('Dealer got blackjack!')
-            settle_hand('dealer', bet)
+            print('Dealer has blackjack!')
+            post_action(dealer, player)
             continue
 
         # Player Turn
-        display_hands()
+        if player.hand.value() == 21:
+            print('Player has blackjack!')
+            post_action(dealer, player, multiplier=3)
+            continue
+
         while True:
+            display_hands(dealer, player)
             action = input('(H)it or (S)tay? ').lower()
 
             if action == 'h':
-                player.add_card(next(deck).up())
-                display_hands()
-                # if player.check() == 'busted':
+                dealer.hit(player.hand)
                 if player.hand.value() > 21:
                     break
 
@@ -167,32 +203,22 @@ def play():
 
         if player.hand.value() > 21:
             print('You busted... Dealer wins!')
-            settle_hand('dealer', bet)
+            post_action(dealer, player)
             continue
 
         # Dealer Turn
-        dealer.hand.cards[0].turn()
+        dealer.turn()
 
         while dealer.hand.value() < 17:
-            dealer.add_card(next(deck).up())
-
-        display_hands()
+            dealer.hit(dealer.hand)
 
         if dealer.hand.value() > 21:
             print('Dealer busts... You Win!')
-            settle_hand('player', bet)
+            post_action(dealer, player)
             continue
 
         # Winner Check
-        if dealer.hand.value() == player.hand.value():
-            print('The hand is a push')
-            settle_hand('push', bet)
-        elif dealer.hand.value() > player.hand.value():
-            print('Dealer wins!')
-            settle_hand('dealer', bet)
-        else:
-            print('Player wins!')
-            settle_hand('player', bet)
+        post_action(dealer, player)
 
 
 if __name__ == '__main__':
